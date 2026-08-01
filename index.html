@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenChat</title>
+    <style>
+        /* Classic Windows Dark Mode Style */
+        :root {
+            --bg-dark: #000000;
+            --win-bg: #1c1c1c;
+            --win-border: #555555;
+            --title-bg: #333333;
+            --text-main: #dfdfdf;
+            --btn-bg: #2a2a2a;
+            --btn-hover: #404040;
+            --btn-active: #111111;
+            --highlight: #0078D7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Tahoma", "Segoe UI", sans-serif;
+            font-size: 12px;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Window Container */
+        .window {
+            background-color: var(--win-bg);
+            border: 1px solid var(--win-border);
+            box-shadow: 2px 2px 0px #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title-bar {
+            background-color: var(--title-bg);
+            padding: 4px 8px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--win-border);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .content {
+            padding: 10px;
+        }
+
+        /* Controls */
+        input[type="text"] {
+            background-color: #000;
+            color: var(--text-main);
+            border: 1px solid var(--win-border);
+            padding: 4px;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--highlight);
+        }
+
+        button {
+            background-color: var(--btn-bg);
+            color: var(--text-main);
+            border: 1px solid var(--win-border);
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        button:hover { background-color: var(--btn-hover); }
+        button:active { background-color: var(--btn-active); border-color: #888; }
+
+        /* Login Screen */
+        #login-screen {
+            width: 300px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* Main App Screen */
+        #app-screen {
+            display: none;
+            width: 800px;
+            height: 500px;
+            flex-direction: column;
+        }
+
+        .app-body {
+            display: flex;
+            flex: 1;
+            gap: 10px;
+            height: calc(100% - 25px);
+        }
+
+        /* Panels */
+        .panel {
+            border: 1px solid var(--win-border);
+            display: flex;
+            flex-direction: column;
+            background: #111;
+        }
+        
+        .panel-header {
+            background: var(--btn-bg);
+            padding: 4px;
+            border-bottom: 1px solid var(--win-border);
+            font-weight: bold;
+        }
+
+        .sidebar { width: 250px; }
+        .main-chat { flex: 1; display: none; } /* Hidden until chat selected */
+
+        /* Lists */
+        ul { list-style: none; overflow-y: auto; flex: 1; }
+        li {
+            padding: 6px;
+            border-bottom: 1px dashed #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        li:hover { background: #1a1a1a; }
+
+        .search-box {
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            border-bottom: 1px solid var(--win-border);
+        }
+        .search-box input { flex: 1; }
+
+        /* Chat Area */
+        .chat-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            background: #0a0a0a;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .message { margin-bottom: 5px; }
+        .msg-time { color: #888; margin-right: 5px; }
+        .msg-author { font-weight: bold; margin-right: 5px; color: var(--highlight); }
+        .msg-author.self { color: #00C853; }
+
+        .chat-input {
+            display: flex;
+            padding: 5px;
+            border-top: 1px solid var(--win-border);
+            gap: 5px;
+        }
+        .chat-input input { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div class="window" id="login-screen">
+        <div class="title-bar">OpenChat - Login</div>
+        <div class="content">
+            <div class="form-group">
+                <label>Enter username:</label>
+                <input type="text" id="username-input" placeholder="DeinName">
+            </div>
+            <button onclick="login()">Connect</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div class="window" id="app-screen">
+        <div class="title-bar">
+            <span>OpenChat</span>
+            <span id="display-user">Logged in as: ?</span>
+        </div>
+        <div class="content app-body">
+            
+            <!-- Left Sidebar: Search & Requests -->
+            <div class="sidebar panel">
+                <div class="panel-header">Search Users</div>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Name..." onkeyup="filterUsers()">
+                </div>
+                <ul id="user-list"></ul>
+
+                <div class="panel-header" style="border-top: 1px solid #555;">Requests</div>
+                <ul id="request-list"></ul>
+                
+                <div class="panel-header" style="border-top: 1px solid #555;">Active Chats</div>
+                <ul id="active-chats-list"></ul>
+            </div>
+
+            <!-- Right Area: Chat -->
+            <div class="main-chat panel" id="chat-panel">
+                <div class="panel-header" id="chat-header">Chat with ...</div>
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Messages go here -->
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="msg-input" placeholder="Message..." onkeypress="handleEnter(event)">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // HIER DEINE INFINITYFREE API URL EINTRAGEN:
+        const BACKEND_URL = "https://koropenchatapi.rf.gd/api.php";
+
+        let myUsername = "";
+        let currentChatUser = null;
+        let activeChats = [];
+        let globalMessages = [];
+        let pollInterval = null;
+
+        function login() {
+            const input = document.getElementById("username-input").value.trim();
+            if(input.length < 3) {
+                alert("Username must be at least 3 characters long.");
+                return;
+            }
+            myUsername = input;
+
+            // Backend informieren
+            fetch(`${BACKEND_URL}?action=login&user=${encodeURIComponent(myUsername)}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("login-screen").style.display = "none";
+                    document.getElementById("app-screen").style.display = "flex";
+                    document.getElementById("display-user").innerText = "Logged in as: " + myUsername;
+
+                    searchUsers("");
+                    startPolling();
+                })
+                .catch(err => {
+                    console.error("Login Fehler:", err);
+                    alert("Verbindung zum Backend fehlgeschlagen!");
+                });
+        }
+
+        // --- User Search & List ---
+        function searchUsers(filter = "") {
+            fetch(`${BACKEND_URL}?action=search&query=${encodeURIComponent(filter)}`)
+                .then(res => res.json())
+                .then(data => {
+                    const list = document.getElementById("user-list");
+                    list.innerHTML = "";
+                    if(data.users) {
+                        data.users.forEach(user => {
+                            if(user !== myUsername) {
+                                const li = document.createElement("li");
+                                li.innerHTML = `
+                                    <span>${user}</span>
+                                    <button onclick="sendRequest('${user}')">Request</button>
+                                `;
+                                list.appendChild(li);
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error("Search Fehler:", err));
+        }
+
+        function filterUsers() {
+            const term = document.getElementById("search-input").value;
+            searchUsers(term);
+        }
+
+        // --- Request System ---
+        function sendRequest(targetUser) {
+            fetch(`${BACKEND_URL}?action=send_request&user=${encodeURIComponent(myUsername)}&target=${encodeURIComponent(targetUser)}`)
+                .then(res => res.json())
+                .then(data => {
+                    alert(`Request sent to ${targetUser}.`);
+                })
+                .catch(err => console.error("Send Request Fehler:", err));
+        }
+
+        function receiveRequestsList(requests) {
+            const list = document.getElementById("request-list");
+            list.innerHTML = "";
+            requests.forEach(fromUser => {
+                // Prüfen ob Anfrage schon in der Liste existiert
+                if(!document.getElementById("req-" + fromUser)) {
+                    const li = document.createElement("li");
+                    li.id = "req-" + fromUser;
+                    li.innerHTML = `
+                        <span>${fromUser}</span>
+                        <div>
+                            <button onclick="acceptRequest('${fromUser}')">Yes</button>
+                            <button onclick="declineRequest('${fromUser}')">No</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                }
+            });
+        }
+
+        function acceptRequest(user) {
+            fetch(`${BACKEND_URL}?action=accept_request&user=${encodeURIComponent(myUsername)}&sender=${encodeURIComponent(user)}`)
+                .then(res => res.json())
+                .then(data => {
+                    const reqEl = document.getElementById("req-" + user);
+                    if(reqEl) reqEl.remove();
+                    startChat(user);
+                })
+                .catch(err => console.error("Accept Request Fehler:", err));
+        }
+
+        function declineRequest(user) {
+            const reqEl = document.getElementById("req-" + user);
+            if(reqEl) reqEl.remove();
+        }
+
+        // --- Chat System ---
+        function startChat(user) {
+            if(!activeChats.includes(user)) {
+                activeChats.push(user);
+                renderActiveChats();
+            }
+            openChatWindow(user);
+        }
+
+        function renderActiveChats() {
+            const list = document.getElementById("active-chats-list");
+            list.innerHTML = "";
+            activeChats.forEach(user => {
+                const li = document.createElement("li");
+                li.style.cursor = "pointer";
+                li.innerHTML = `<span>> ${user}</span>`;
+                li.onclick = () => openChatWindow(user);
+                list.appendChild(li);
+            });
+        }
+
+        function openChatWindow(user) {
+            currentChatUser = user;
+            document.getElementById("chat-panel").style.display = "flex";
+            document.getElementById("chat-header").innerText = `Chat with ${user}`;
+            renderMessages();
+        }
+
+        function handleEnter(e) {
+            if(e.key === "Enter") sendMessage();
+        }
+
+        function sendMessage() {
+            if(!currentChatUser) return;
+            const inputField = document.getElementById("msg-input");
+            const text = inputField.value.trim();
+            
+            if(text !== "") {
+                fetch(`${BACKEND_URL}?action=send_message&user=${encodeURIComponent(myUsername)}&receiver=${encodeURIComponent(currentChatUser)}&msg=${encodeURIComponent(text)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        inputField.value = "";
+                        poll(); // Sofort abrufen nach dem Senden
+                    })
+                    .catch(err => console.error("Send Message Fehler:", err));
+            }
+        }
+
+        function startPolling() {
+            if(pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(poll, 3000); // Alle 3 Sekunden Daten holen
+            poll();
+        }
+
+        function poll() {
+            if(!myUsername) return;
+            fetch(`${BACKEND_URL}?action=poll&user=${encodeURIComponent(myUsername)}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Anfragen aktualisieren
+                    if(data.requests) {
+                        receiveRequestsList(data.requests);
+                    }
+                    // Nachrichten aktualisieren
+                    if(data.messages) {
+                        globalMessages = data.messages;
+                        
+                        // Aktive Chats automatisch anhand von Nachrichten ergänzen
+                        globalMessages.forEach(m => {
+                            let partner = (m.sender === myUsername) ? m.receiver : m.sender;
+                            if(partner && partner !== myUsername && !activeChats.includes(partner)) {
+                                activeChats.push(partner);
+                            }
+                        });
+                        renderActiveChats();
+                        
+                        if(currentChatUser) {
+                            renderMessages();
+                        }
+                    }
+                })
+                .catch(err => console.error("Poll Fehler:", err));
+        }
+
+        function renderMessages() {
+            if(!currentChatUser) return;
+            const container = document.getElementById("chat-messages");
+            container.innerHTML = "";
+
+            globalMessages.forEach(m => {
+                if((m.sender === myUsername && m.receiver === currentChatUser) || 
+                   (m.sender === currentChatUser && m.receiver === myUsername)) {
+                    const div = document.createElement("div");
+                    div.className = "message";
+                    
+                    let time = "";
+                    if(m.timestamp) {
+                        const dateObj = new Date(m.timestamp);
+                        time = isNaN(dateObj.getTime()) ? m.timestamp : dateObj.toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric" });
+                    }
+                    
+                    const isSelf = (m.sender === myUsername);
+                    const authorClass = isSelf ? "msg-author self" : "msg-author";
+                    div.innerHTML = `<span class="msg-time">[${time}]</span> <span class="${authorClass}">${m.sender}:</span> <span>${m.message_text}</span>`;
+                    container.appendChild(div);
+                }
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html>
